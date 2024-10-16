@@ -1,12 +1,27 @@
 package me.zedaster.articleservice.controller;
 
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RestController;
+import lombok.AllArgsConstructor;
+import me.zedaster.articleservice.dto.request.UpdateCreatorRequest;
+import me.zedaster.articleservice.service.CreatorService;
+import org.springframework.web.bind.annotation.*;
 
-@RestController("/articles/creators")
+/**
+ * Controller for internal requests to work with creators of the articles
+ */
+@AllArgsConstructor
+@RestController
+@RequestMapping("/internal/articles/creators")
 public class CreatorController {
-    @PostMapping()
-    public void changeUsername() {
-        // TODO
+    /**
+     * Service to work with creators
+     */
+    private final CreatorService creatorService;
+
+    /**
+     * Change data of saved creator
+     */
+    @PutMapping("/{id}")
+    public void changeData(@PathVariable("id") long userId, @RequestBody UpdateCreatorRequest request) {
+        creatorService.updateCreator(userId, request);
     }
 }

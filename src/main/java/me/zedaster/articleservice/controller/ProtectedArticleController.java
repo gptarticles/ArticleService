@@ -1,8 +1,8 @@
 package me.zedaster.articleservice.controller;
 
 import lombok.AllArgsConstructor;
-import me.zedaster.articleservice.dto.response.CreateArticleResponse;
 import me.zedaster.articleservice.dto.request.ArticleDataRequest;
+import me.zedaster.articleservice.dto.response.CreateArticleResponse;
 import me.zedaster.articleservice.model.ArticleSummary;
 import me.zedaster.articleservice.service.ArticleService;
 import org.springframework.web.bind.annotation.*;
