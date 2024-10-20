@@ -42,6 +42,6 @@ public class CreatorControllerTest {
                 .andExpect(status().isOk());
 
         Mockito.verify(creatorService, times(1))
-                .updateCreator(123L, new UpdateCreatorRequest("jolly"));
+                .updateCreator(123L, "jolly");
     }
 }

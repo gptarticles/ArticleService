@@ -3,6 +3,7 @@ package me.zedaster.articleservice.controller;
 import lombok.AllArgsConstructor;
 import me.zedaster.articleservice.dto.request.UpdateCreatorRequest;
 import me.zedaster.articleservice.service.CreatorService;
+import me.zedaster.articleservice.service.CreatorServiceException;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -21,7 +22,7 @@ public class CreatorController {
      * Change data of saved creator
      */
     @PutMapping("/{id}")
-    public void changeData(@PathVariable("id") long userId, @RequestBody UpdateCreatorRequest request) {
-        creatorService.updateCreator(userId, request);
+    public void changeData(@PathVariable("id") long userId, @RequestBody UpdateCreatorRequest request) throws CreatorServiceException {
+        creatorService.updateCreator(userId, request.getNewUsername());
     }
 }

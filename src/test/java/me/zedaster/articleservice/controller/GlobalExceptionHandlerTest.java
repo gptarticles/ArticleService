@@ -7,6 +7,7 @@ import me.zedaster.articleservice.dto.article.ArticleData;
 import me.zedaster.articleservice.service.ArticleService;
 import me.zedaster.articleservice.service.ArticleServiceException;
 import me.zedaster.articleservice.service.CreatorService;
+import me.zedaster.articleservice.service.CreatorServiceException;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,10 +27,11 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest({ProtectedArticleController.class, ArticleController.class})
+@WebMvcTest({ProtectedArticleController.class, ArticleController.class, CreatorController.class})
 public class GlobalExceptionHandlerTest {
 
     @MockBean
@@ -64,6 +66,19 @@ public class GlobalExceptionHandlerTest {
         mockMvc.perform(post("/protected/articles/user")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content((contentJson)))
+                .andExpect(status().is(400))
+                .andExpect(jsonPath("$.*", hasSize(1)))
+                .andExpect(jsonPath("$.message").value("Some error message"));
+    }
+
+    @Test
+    public void handleCreatorServiceException() throws Exception {
+        doThrow(new CreatorServiceException("Some error message"))
+                .when(creatorService).updateCreator(anyLong(), anyString());
+
+        mockMvc.perform(put("/internal/articles/creators/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newUsername\": \"john\"}"))
                 .andExpect(status().is(400))
                 .andExpect(jsonPath("$.*", hasSize(1)))
                 .andExpect(jsonPath("$.message").value("Some error message"));

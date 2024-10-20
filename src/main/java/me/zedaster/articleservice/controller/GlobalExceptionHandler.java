@@ -5,6 +5,7 @@ import jakarta.validation.Path;
 import me.zedaster.articleservice.dto.error.ErrorDto;
 import me.zedaster.articleservice.dto.error.ValidationErrorDto;
 import me.zedaster.articleservice.service.ArticleServiceException;
+import me.zedaster.articleservice.service.CreatorServiceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -53,7 +54,7 @@ public class GlobalExceptionHandler {
      * @param exception The instance of the exception.
      * @return Json with error message from the exception.
      */
-    @ExceptionHandler({ArticleServiceException.class})
+    @ExceptionHandler({ArticleServiceException.class, CreatorServiceException.class})
     public ResponseEntity<ErrorDto> handleSimpleExceptions(Exception exception) {
         return new ResponseEntity<>(new ErrorDto(exception.getMessage()), HttpStatus.BAD_REQUEST);
     }
