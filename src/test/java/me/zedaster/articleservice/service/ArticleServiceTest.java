@@ -8,9 +8,9 @@ import me.zedaster.articleservice.entity.ArticleInfo;
 import me.zedaster.articleservice.entity.Creator;
 import me.zedaster.articleservice.repository.ArticleInfoRepository;
 import me.zedaster.articleservice.repository.CreatorRepository;
-import me.zedaster.articleservice.service.content.ContentService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,9 +21,12 @@ import org.springframework.data.domain.PageRequest;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 import static me.zedaster.articleservice.util.TestUtils.createInstantOf;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 
 /**
  * Tests for {@link ArticleService}
@@ -46,7 +49,7 @@ public class ArticleServiceTest {
      * Checks if the getter of an article is called and the result is correct
      */
     @Test
-    public void getExistingArticle() {
+    public void getExistingArticle() throws ContentServiceException {
         Instant fakeCreatedAt = createInstantOf(2024, 1, 1, 17, 40, 0);
         Creator fakeCreator = new Creator(123L, "john");
         ArticleInfo fakeArticleInfo = new ArticleInfo("Test title", fakeCreatedAt, fakeCreator);
@@ -82,12 +85,43 @@ public class ArticleServiceTest {
      * Checks if the getter of a non-existing article returns an empty optional
      */
     @Test
-    public void getNonExistingArticle() {
+    public void getNonExistingArticle() throws ContentServiceException {
         Mockito.when(articleInfoRepository.findById(123L)).thenReturn(Optional.empty());
         Mockito.when(contentService.getContentByArticleId(123L)).thenReturn(Optional.empty());
 
         Optional<Article> article = articleService.getArticle(123);
         Assertions.assertTrue(article.isEmpty());
+    }
+
+    @Test
+    public void getArticleWithContentServiceException() throws ContentServiceException {
+        Instant fakeCreatedAt = createInstantOf(2024, 1, 1, 17, 40, 0);
+        Creator fakeCreator = new Creator(123L, "john");
+        ArticleInfo fakeArticleInfo = new ArticleInfo("Test title", fakeCreatedAt, fakeCreator);
+        fakeArticleInfo.setId(1L);
+
+        Mockito.when(articleInfoRepository.findById(1L)).thenReturn(Optional.of(fakeArticleInfo));
+        Exception cause = new Exception("Test cause");
+        Exception contentException = new ContentServiceException("Test exception", cause);
+        Mockito.when(contentService.getContentByArticleId(1L)).thenThrow(contentException);
+
+        InternalServerException ex = Assertions.assertThrows(InternalServerException.class, () -> articleService.getArticle(1));
+        Assertions.assertEquals("Can't get content of the article!", ex.getMessage());
+        Assertions.assertSame(contentException, ex.getCause());
+    }
+
+    @Test
+    public void getArticleWithNonExistentContent() throws ContentServiceException {
+        Instant fakeCreatedAt = createInstantOf(2024, 1, 1, 17, 40, 0);
+        Creator fakeCreator = new Creator(123L, "john");
+        ArticleInfo fakeArticleInfo = new ArticleInfo("Test title", fakeCreatedAt, fakeCreator);
+        fakeArticleInfo.setId(1L);
+
+        Mockito.when(articleInfoRepository.findById(1L)).thenReturn(Optional.of(fakeArticleInfo));
+        Mockito.when(contentService.getContentByArticleId(1L)).thenReturn(Optional.empty());
+
+        InternalServerException ex = Assertions.assertThrows(InternalServerException.class, () -> articleService.getArticle(1));
+        Assertions.assertEquals("ArticleInfo exists, but there's no content for the article!", ex.getMessage());
     }
 
     /**
@@ -213,7 +247,7 @@ public class ArticleServiceTest {
      * @throws ArticleServiceException This exception should be not thrown
      */
     @Test
-    public void createArticleCorrectly() throws ArticleServiceException {
+    public void createArticleCorrectly() throws ArticleServiceException, ContentServiceException {
         Creator fakeCreator = new Creator(1L, "john");
         List<String> correctTitles = List.of("a".repeat(15), "a".repeat(100));
         List<String> correctContents = List.of("a".repeat(100), "a".repeat(18_000));
@@ -233,13 +267,14 @@ public class ArticleServiceTest {
                     ArticleInfo resultInfo = new ArticleInfo(title, fakeNow, fakeCreator);
                     resultInfo.setId(1L);
 
-                    Mockito.when(articleInfoRepository.save(Mockito.eq(fakeInfo)))
+                    Mockito.when(articleInfoRepository.save(any(ArticleInfo.class)))
                             .thenReturn(resultInfo);
 
                     long articleId = articleService.createArticle(1L, fakeData);
                     Assertions.assertEquals(1L, articleId);
 
-                    Mockito.verify(articleInfoRepository, Mockito.times(1)).save(Mockito.eq(fakeInfo));
+                    Mockito.verify(articleInfoRepository, Mockito.times(1))
+                            .save(argThat(info -> assertArticleInfosEqual(fakeInfo, info)));
                     Mockito.verify(contentService, Mockito.times(1)).saveContent(1L, content);
 
                     Mockito.reset(articleInfoRepository);
@@ -380,11 +415,57 @@ public class ArticleServiceTest {
     }
 
     /**
+     * Checks if the creation of an article with a content service exception. It should throw an internal exception and
+     * delete all created data
+     * @throws ArticleServiceException This exception should be not thrown
+     * @throws ContentServiceException This exception should be not thrown
+     */
+    @Test
+    public void createArticleWithContentServiceException() throws ArticleServiceException, ContentServiceException {
+        Creator fakeCreator = new Creator(1L, "john");
+        String title = "a".repeat(15);
+        String content = "a".repeat(100);
+        Instant fakeNow = createInstantOf(2024, 1, 1, 17, 40, 0);
+
+        Mockito.when(creatorRepository.findById(1L)).thenReturn(Optional.of(fakeCreator));
+        Mockito.when(articleInfoRepository.existsByCreatorAndTitle(fakeCreator, title))
+                .thenReturn(false);
+
+        ArticleData fakeData = new ArticleData(title, content);
+        ArticleInfo fakeInfo = new ArticleInfo(title, fakeNow, fakeCreator);
+        ArticleInfo resultInfo = new ArticleInfo(title, fakeNow, fakeCreator);
+        resultInfo.setId(1L);
+
+        Mockito.when(articleInfoRepository.save(Mockito.eq(fakeInfo)))
+                .thenReturn(resultInfo);
+
+        Exception contentException = new ContentServiceException("Test exception", new Exception("Test cause"));
+        Mockito.doThrow(contentException)
+                .when(contentService).saveContent(1L, content);
+
+        InOrder inOrder = Mockito.inOrder(articleInfoRepository, contentService);
+        // Mock Instant
+        try (MockedStatic<Instant> mockedInstant = Mockito.mockStatic(Instant.class)) {
+            mockedInstant.when(Instant::now).thenReturn(fakeNow);
+            InternalServerException ex = Assertions.assertThrows(InternalServerException.class,
+                    () -> articleService.createArticle(1L, fakeData));
+            Assertions.assertEquals("Failed to save content for the article!", ex.getMessage());
+            Assertions.assertEquals(contentException, ex.getCause());
+
+            inOrder.verify(articleInfoRepository, Mockito.times(1)).save(
+                    argThat(info -> assertArticleInfosEqual(fakeInfo, info)));
+            inOrder.verify(contentService, Mockito.times(1)).saveContent(1L, content);
+            inOrder.verify(articleInfoRepository, Mockito.times(1)).deleteById(1L);
+        }
+
+    }
+
+    /**
      * Checks updating of an article with correct data
      * @throws ArticleServiceException This exception should be not thrown
      */
     @Test
-    public void updateArticleCorrectly() throws ArticleServiceException {
+    public void updateArticleCorrectly() throws ArticleServiceException, ContentServiceException {
         Creator fakeCreator = new Creator(1L, "john");
         Instant fakeNow = createInstantOf(2024, 1, 1, 17, 40, 0);
         ArticleInfo fakeArticleInfo = new ArticleInfo("Test title", fakeNow, fakeCreator);
@@ -401,7 +482,8 @@ public class ArticleServiceTest {
         ArticleInfo expectedInfo = new ArticleInfo(newTitle, fakeNow, fakeCreator);
         expectedInfo.setId(1L);
 
-        Mockito.verify(articleInfoRepository, Mockito.times(1)).save(Mockito.eq(expectedInfo));
+        Mockito.verify(articleInfoRepository, Mockito.times(1))
+                .save(argThat(info -> assertArticleInfosEqual(expectedInfo, info)));
         Mockito.verify(contentService, Mockito.times(1)).saveContent(1L, newContent);
     }
 
@@ -578,5 +660,50 @@ public class ArticleServiceTest {
         ArticleServiceException ex = Assertions.assertThrows(ArticleServiceException.class,
                 () -> articleService.updateArticle(2L, 1L, fakeData));
         Assertions.assertEquals("You can't update the article of another user!", ex.getMessage());
+    }
+
+    /**
+     * Checks if updating of an article with a content service exception. It should throw an internal exception and
+     * roll back the changes.
+     * @throws ContentServiceException This exception should be not thrown
+     */
+    @Test
+    public void updateArticleWithContentServiceException() throws ContentServiceException {
+        Creator fakeCreator = new Creator(1L, "john");
+        Instant fakeNow = createInstantOf(2024, 1, 1, 17, 40, 0);
+        ArticleInfo oldArticleInfo = new ArticleInfo("Test title", fakeNow, fakeCreator);
+        oldArticleInfo.setId(1L);
+
+        Mockito.when(articleInfoRepository.findById(1L)).thenReturn(Optional.of(oldArticleInfo));
+
+        String newTitle = "b".repeat(50);
+        String newContent = "b".repeat(5_000);
+        ArticleData fakeData = new ArticleData(newTitle, newContent);
+
+        ContentServiceException contentException = new ContentServiceException("Test exception", new Exception("Test cause"));
+        Mockito.doThrow(contentException).when(contentService).saveContent(1L, newContent);
+
+        InOrder inOrder = Mockito.inOrder(articleInfoRepository, contentService);
+        InternalServerException ex = Assertions.assertThrows(InternalServerException.class, () ->
+                articleService.updateArticle(1L, 1L, fakeData));
+
+        Assertions.assertEquals("Failed to update content for the article!", ex.getMessage());
+        Assertions.assertEquals(contentException, ex.getCause());
+
+        ArticleInfo newInfo = new ArticleInfo(newTitle, fakeNow, fakeCreator);
+        newInfo.setId(1L);
+
+        inOrder.verify(articleInfoRepository, Mockito.times(1)).save(
+                argThat(info -> assertArticleInfosEqual(newInfo, info)));
+        inOrder.verify(contentService, Mockito.times(1)).saveContent(1L, newContent);
+        inOrder.verify(articleInfoRepository, Mockito.times(1)).save(Mockito.same(oldArticleInfo));
+    }
+
+    private boolean assertArticleInfosEqual(ArticleInfo expected, ArticleInfo actual) {
+        return Objects.equals(expected.getId(), actual.getId()) &&
+                Objects.equals(expected.getTitle(), actual.getTitle()) &&
+                Objects.equals(expected.getCreatedAt(), actual.getCreatedAt()) &&
+                Objects.equals(expected.getCreator().getCreatorId(), actual.getCreator().getCreatorId()) &&
+                Objects.equals(expected.getCreator().getUsername(), actual.getCreator().getUsername());
     }
 }

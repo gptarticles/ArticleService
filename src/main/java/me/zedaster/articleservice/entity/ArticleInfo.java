@@ -17,7 +17,7 @@ import java.time.Instant;
 @Setter
 @EqualsAndHashCode(of = "id")
 @NoArgsConstructor
-public class ArticleInfo implements Cloneable {
+public class ArticleInfo {
     /**
      * Article ID
      */
@@ -46,5 +46,16 @@ public class ArticleInfo implements Cloneable {
         this.title = title;
         this.createdAt = createdAt;
         this.creator = creator;
+    }
+
+    private ArticleInfo(ArticleInfo articleInfo) {
+        this.id = articleInfo.id;
+        this.title = articleInfo.title;
+        this.createdAt = articleInfo.createdAt;
+        this.creator = articleInfo.creator;
+    }
+
+    public ArticleInfo copy() {
+        return new ArticleInfo(this);
     }
 }

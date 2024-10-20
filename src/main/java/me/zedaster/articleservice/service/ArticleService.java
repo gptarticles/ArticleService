@@ -11,13 +11,13 @@ import me.zedaster.articleservice.entity.ArticleInfo;
 import me.zedaster.articleservice.entity.Creator;
 import me.zedaster.articleservice.repository.ArticleInfoRepository;
 import me.zedaster.articleservice.repository.CreatorRepository;
-import me.zedaster.articleservice.service.content.ContentService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 /**
@@ -60,7 +60,15 @@ public class ArticleService {
         if (info.isEmpty()) {
             return Optional.empty();
         }
-        String content = contentService.getContentByArticleId(id).orElseThrow();
+
+        String content;
+        try {
+            content = contentService.getContentByArticleId(id).orElseThrow();
+        } catch (ContentServiceException e) {
+            throw new InternalServerException("Can't get content of the article!", e);
+        } catch (NoSuchElementException e) {
+            throw new InternalServerException("ArticleInfo exists, but there's no content for the article!", e);
+        }
         return Optional.of(new Article(info.get(), content));
     }
 
@@ -106,7 +114,12 @@ public class ArticleService {
             throw new ArticleServiceException("User already has an article with the same title!");
         }
         ArticleInfo info = articleInfoRepository.save(new ArticleInfo(articleData.getTitle(), Instant.now(), creator));
-        contentService.saveContent(info.getId(), articleData.getContent());
+        try {
+            contentService.saveContent(info.getId(), articleData.getContent());
+        } catch (ContentServiceException e) {
+            articleInfoRepository.deleteById(info.getId());
+            throw new InternalServerException("Failed to save content for the article!", e);
+        }
         return info.getId();
     }
 
@@ -120,20 +133,26 @@ public class ArticleService {
             @Min(value = 1, message = INCORRECT_USER_ID) long userId,
             @Min(value = 1, message = INCORRECT_ARTICLE_ID) long articleId,
             @NotNull(message = ARTICLE_DATA_NOT_NULL) @Valid ArticleData articleData) throws ArticleServiceException {
-        ArticleInfo info = articleInfoRepository.findById(articleId).orElseThrow(() ->
+        ArticleInfo oldInfo = articleInfoRepository.findById(articleId).orElseThrow(() ->
                 new ArticleServiceException("Article with the specified ID doesn't exist!"));
 
-        if (info.getCreator().getCreatorId() != userId) {
+        if (oldInfo.getCreator().getCreatorId() != userId) {
             throw new ArticleServiceException("You can't update the article of another user!");
         }
 
-        if (articleInfoRepository.existsByCreatorAndTitle(info.getCreator(), articleData.getTitle())) {
+        if (articleInfoRepository.existsByCreatorAndTitle(oldInfo.getCreator(), articleData.getTitle())) {
             throw new ArticleServiceException("User already has an article with the same title!");
         }
 
-        info.setTitle(articleData.getTitle());
+        ArticleInfo newInfo = oldInfo.copy();
+        newInfo.setTitle(articleData.getTitle());
+        articleInfoRepository.save(newInfo);
 
-        contentService.saveContent(info.getId(), articleData.getContent());
-        articleInfoRepository.save(info);
+        try {
+            contentService.saveContent(oldInfo.getId(), articleData.getContent());
+        } catch (ContentServiceException e) {
+            articleInfoRepository.save(oldInfo);
+            throw new InternalServerException("Failed to update content for the article!", e);
+        }
     }
 }
