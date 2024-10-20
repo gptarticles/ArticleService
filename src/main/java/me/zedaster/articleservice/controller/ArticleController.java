@@ -1,8 +1,8 @@
 package me.zedaster.articleservice.controller;
 
 import lombok.AllArgsConstructor;
-import me.zedaster.articleservice.model.Article;
-import me.zedaster.articleservice.model.ArticleSummary;
+import me.zedaster.articleservice.dto.article.Article;
+import me.zedaster.articleservice.dto.article.ArticleSummary;
 import me.zedaster.articleservice.service.ArticleService;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,8 +26,8 @@ public class ArticleController {
      * @return Article object
      */
     @GetMapping("/{id}")
-    public Article getArticle(@PathVariable("id") long id) throws NumberFormatException {
-        return articleService.getArticle(id);
+    public Article getArticle(@PathVariable("id") long id) throws NotFoundException {
+        return articleService.getArticle(id).orElseThrow(() -> new NotFoundException("Article not found"));
     }
 
     /**

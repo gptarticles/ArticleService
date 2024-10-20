@@ -1,4 +1,4 @@
-package me.zedaster.articleservice.dto;
+package me.zedaster.articleservice.dto.error;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

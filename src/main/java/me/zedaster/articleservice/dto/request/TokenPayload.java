@@ -1,4 +1,4 @@
-package me.zedaster.articleservice.dto;
+package me.zedaster.articleservice.dto.request;
 
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
