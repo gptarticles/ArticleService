@@ -125,20 +125,14 @@ public class ArticleService {
 
     /**
      * Updates an existing article
-     * @param userId ID of the user that is updating the article
      * @param articleId ID of the article
      * @param articleData New data for the article
      */
     public void updateArticle(
-            @Min(value = 1, message = INCORRECT_USER_ID) long userId,
             @Min(value = 1, message = INCORRECT_ARTICLE_ID) long articleId,
             @NotNull(message = ARTICLE_DATA_NOT_NULL) @Valid ArticleData articleData) throws ArticleServiceException {
         ArticleInfo oldInfo = articleInfoRepository.findById(articleId).orElseThrow(() ->
                 new ArticleServiceException("Article with the specified ID doesn't exist!"));
-
-        if (oldInfo.getCreator().getCreatorId() != userId) {
-            throw new ArticleServiceException("You can't update the article of another user!");
-        }
 
         if (articleInfoRepository.existsByCreatorAndTitle(oldInfo.getCreator(), articleData.getTitle())) {
             throw new ArticleServiceException("User already has an article with the same title!");

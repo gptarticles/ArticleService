@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 @AllArgsConstructor
 @RestController
 @RequestMapping("/internal/articles/creators")
+
 public class CreatorController {
     /**
      * Service to work with creators

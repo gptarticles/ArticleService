@@ -477,7 +477,7 @@ public class ArticleServiceTest {
         String newContent = "b".repeat(5_000);
         ArticleData fakeData = new ArticleData(newTitle, newContent);
 
-        articleService.updateArticle(1L, 1L, fakeData);
+        articleService.updateArticle(1L, fakeData);
 
         ArticleInfo expectedInfo = new ArticleInfo(newTitle, fakeNow, fakeCreator);
         expectedInfo.setId(1L);
@@ -485,24 +485,6 @@ public class ArticleServiceTest {
         Mockito.verify(articleInfoRepository, Mockito.times(1))
                 .save(argThat(info -> assertArticleInfosEqual(expectedInfo, info)));
         Mockito.verify(contentService, Mockito.times(1)).saveContent(1L, newContent);
-    }
-
-    /**
-     * Checks if updating of an article with incorrect user ID throws an exception
-     */
-    @Test
-    public void updateArticleWithIncorrectUserId() {
-        String title = "a".repeat(50);
-        String content = "a".repeat(5_000);
-        ArticleData fakeData = new ArticleData(title, content);
-
-        for (int id : List.of(0, -1)) {
-            ConstraintViolationException ex = Assertions.assertThrows(ConstraintViolationException.class,
-                    () -> articleService.updateArticle(id, 1, fakeData));
-            Assertions.assertEquals(1, ex.getConstraintViolations().size());
-            Assertions.assertEquals("User id must be bigger than zero!",
-                    ex.getConstraintViolations().stream().findFirst().get().getMessage());
-        }
     }
 
     /**
@@ -516,7 +498,7 @@ public class ArticleServiceTest {
 
         for (int id : List.of(0, -1)) {
             ConstraintViolationException ex = Assertions.assertThrows(ConstraintViolationException.class,
-                    () -> articleService.updateArticle(1, id, fakeData));
+                    () -> articleService.updateArticle(id, fakeData));
             Assertions.assertEquals(1, ex.getConstraintViolations().size());
             Assertions.assertEquals("Article id must be bigger than zero!",
                     ex.getConstraintViolations().stream().findFirst().get().getMessage());
@@ -529,7 +511,7 @@ public class ArticleServiceTest {
     @Test
     public void updateArticleWithNullArticleData() {
         ConstraintViolationException ex = Assertions.assertThrows(ConstraintViolationException.class,
-                () -> articleService.updateArticle(1, 1, null));
+                () -> articleService.updateArticle(1, null));
         Assertions.assertEquals(1, ex.getConstraintViolations().size());
         Assertions.assertEquals("Article data must be not null!",
                 ex.getConstraintViolations().stream().findFirst().get().getMessage());
@@ -545,7 +527,7 @@ public class ArticleServiceTest {
         ArticleData fakeData = new ArticleData(title, content);
 
         ConstraintViolationException ex = Assertions.assertThrows(ConstraintViolationException.class,
-                () -> articleService.updateArticle(1, 1, fakeData));
+                () -> articleService.updateArticle(1, fakeData));
         Assertions.assertEquals(1, ex.getConstraintViolations().size());
         Assertions.assertEquals("Title mustn't contain more than 100 characters!",
                 ex.getConstraintViolations().stream().findFirst().get().getMessage());
@@ -561,7 +543,7 @@ public class ArticleServiceTest {
         ArticleData fakeData = new ArticleData(title, content);
 
         ConstraintViolationException ex = Assertions.assertThrows(ConstraintViolationException.class,
-                () -> articleService.updateArticle(1, 1, fakeData));
+                () -> articleService.updateArticle(1, fakeData));
         Assertions.assertEquals(1, ex.getConstraintViolations().size());
         Assertions.assertEquals("Title must contain at least 15 characters!",
                 ex.getConstraintViolations().stream().findFirst().get().getMessage());
@@ -577,7 +559,7 @@ public class ArticleServiceTest {
         ArticleData fakeData = new ArticleData(title, content);
 
         ConstraintViolationException ex = Assertions.assertThrows(ConstraintViolationException.class,
-                () -> articleService.updateArticle(1, 1, fakeData));
+                () -> articleService.updateArticle(1, fakeData));
         Assertions.assertEquals(1, ex.getConstraintViolations().size());
         Assertions.assertEquals("Content mustn't contain more than 18 000 characters!",
                 ex.getConstraintViolations().stream().findFirst().get().getMessage());
@@ -593,7 +575,7 @@ public class ArticleServiceTest {
         ArticleData fakeData = new ArticleData(title, content);
 
         ConstraintViolationException ex = Assertions.assertThrows(ConstraintViolationException.class,
-                () -> articleService.updateArticle(1, 1, fakeData));
+                () -> articleService.updateArticle(1, fakeData));
         Assertions.assertEquals(1, ex.getConstraintViolations().size());
         Assertions.assertEquals("Content must contain at least 100 characters!",
                 ex.getConstraintViolations().stream().findFirst().get().getMessage());
@@ -611,7 +593,7 @@ public class ArticleServiceTest {
         Mockito.when(articleInfoRepository.findById(1L)).thenReturn(Optional.empty());
 
         ArticleServiceException ex = Assertions.assertThrows(ArticleServiceException.class,
-                () -> articleService.updateArticle(1L, 1L, fakeData));
+                () -> articleService.updateArticle(1L, fakeData));
         Assertions.assertEquals("Article with the specified ID doesn't exist!", ex.getMessage());
     }
 
@@ -637,29 +619,8 @@ public class ArticleServiceTest {
                 .thenReturn(true);
 
         ArticleServiceException ex = Assertions.assertThrows(ArticleServiceException.class,
-                () -> articleService.updateArticle(1L, 1L, fakeData));
+                () -> articleService.updateArticle(1L, fakeData));
         Assertions.assertEquals("User already has an article with the same title!", ex.getMessage());
-    }
-
-    /**
-     * Checks if updating of an article of another creator throws an exception
-     */
-    @Test
-    public void updateArticleOfOtherCreator() {
-        Creator fakeCreator = new Creator(1L, "john");
-        Instant fakeNow = createInstantOf(2024, 1, 1, 17, 40, 0);
-        ArticleInfo fakeArticleInfo = new ArticleInfo("Test title", fakeNow, fakeCreator);
-        fakeArticleInfo.setId(1L);
-
-        Mockito.when(articleInfoRepository.findById(1L)).thenReturn(Optional.of(fakeArticleInfo));
-
-        String newTitle = "b".repeat(50);
-        String newContent = "b".repeat(5_000);
-        ArticleData fakeData = new ArticleData(newTitle, newContent);
-
-        ArticleServiceException ex = Assertions.assertThrows(ArticleServiceException.class,
-                () -> articleService.updateArticle(2L, 1L, fakeData));
-        Assertions.assertEquals("You can't update the article of another user!", ex.getMessage());
     }
 
     /**
@@ -685,7 +646,7 @@ public class ArticleServiceTest {
 
         InOrder inOrder = Mockito.inOrder(articleInfoRepository, contentService);
         InternalServerException ex = Assertions.assertThrows(InternalServerException.class, () ->
-                articleService.updateArticle(1L, 1L, fakeData));
+                articleService.updateArticle(1L, fakeData));
 
         Assertions.assertEquals("Failed to update content for the article!", ex.getMessage());
         Assertions.assertEquals(contentException, ex.getCause());

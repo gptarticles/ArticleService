@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest({ProtectedArticleController.class, ArticleController.class, CreatorController.class})
+@WebMvcTest({ArticleController.class, InternalArticleController.class, CreatorController.class})
 public class GlobalExceptionHandlerTest {
 
     @MockBean
@@ -53,17 +53,12 @@ public class GlobalExceptionHandlerTest {
 
         String contentJson = """
                 {
-                  "tokenPayload": {
-                    "userId": 1,
-                    "username": "john"
-                  },
-                  "articleData": {
-                    "title": "%s",
-                    "content": "%s"
-                  }
-                }""".formatted("a", "b");
+                  "title": "a",
+                  "content": "b",
+                  "creatorId": 1
+                }""";
 
-        mockMvc.perform(post("/protected/articles/user")
+        mockMvc.perform(post("/internal/articles")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content((contentJson)))
                 .andExpect(status().is(400))
@@ -109,17 +104,12 @@ public class GlobalExceptionHandlerTest {
 
         String contentJson = """
                 {
-                  "tokenPayload": {
-                    "userId": 1,
-                    "username": "john"
-                  },
-                  "articleData": {
-                    "title": "%s",
-                    "content": "%s"
-                  }
-                }""".formatted("a", "b");
+                  "title": "a",
+                  "content": "b",
+                  "creatorId": 1
+                }""";
 
-        mockMvc.perform(post("/protected/articles/user")
+        mockMvc.perform(post("/internal/articles")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content((contentJson)))
                 .andExpect(status().is(400))

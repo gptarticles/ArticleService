@@ -26,7 +26,7 @@ public class ArticleController {
      * @return Article object
      */
     @GetMapping("/{id}")
-    public Article getArticle(@PathVariable("id") long id) throws NotFoundException {
+    public Article getArticle(@PathVariable long id) throws NotFoundException {
         return articleService.getArticle(id).orElseThrow(() -> new NotFoundException("Article not found"));
     }
 
