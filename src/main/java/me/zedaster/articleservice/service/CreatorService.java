@@ -1,58 +1,76 @@
 package me.zedaster.articleservice.service;
 
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
-import lombok.AllArgsConstructor;
-import me.zedaster.articleservice.entity.Creator;
-import me.zedaster.articleservice.repository.CreatorRepository;
+import me.zedaster.articleservice.configuration.microservice.AuthServiceConfiguration;
+import me.zedaster.articleservice.dto.article.Creator;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import java.net.URI;
+import java.util.List;
+import java.util.stream.IntStream;
 
 /**
  * Service to work with data of the creators
  */
 @Service
 @Validated
-@AllArgsConstructor
 public class CreatorService {
+    private final RestClient restClient;
 
-    private static final String INCORRECT_USER_ID = "User id must be bigger than zero!";
-
-    private static final String NULL_USER_NAME = "Username must be not null!";
-
-    private static final String INCORRECT_USER_NAME = "Username does not meet the requirements!";
-
-    private static final String USER_NAME_REGEX = "^[a-zA-Z][a-zA-Z0-9._]{2,31}$";
-
-
-    private final CreatorRepository creatorRepository;
+    public CreatorService(AuthServiceConfiguration configuration) {
+        this.restClient = RestClient.create(configuration.getUri());
+    }
 
     /**
-     * Add a creator if he doesn't exist in the database
-     * @param userId User ID of the creator
-     * @param username Username of the creator
+     * Get creators by their ids.
+     * @param userIds List of creator ids
+     * @throws InternalServerException If the creator service is not available
+     * @return List of creators
      */
-    public void addIfNotExist(@Min(value = 1, message = INCORRECT_USER_ID) long userId,
-                              @NotNull(message = NULL_USER_NAME)
-                              @Pattern(regexp = USER_NAME_REGEX, message = INCORRECT_USER_NAME) String username) {
-        if (!creatorRepository.existsById(userId)) {
-            creatorRepository.save(new Creator(userId, username));
+    public List<Creator> getCreatorsByIds(List<Long> userIds) {
+        try {
+            URI uri = UriComponentsBuilder
+                    .fromPath("/internal/profile/usernames")
+                    .queryParam("ids", userIds)
+                    .build()
+                    .toUri();
+            List<String> names = restClient.get()
+                    .uri(uri)
+                    .retrieve()
+                    .toEntity(new ParameterizedTypeReference<List<String>>() {})
+                    .getBody();
+            return IntStream.range(0, userIds.size())
+                    .mapToObj(i -> new Creator(userIds.get(i), names.get(i)))
+                    .toList();
+        } catch (ResourceAccessException e) {
+            throw new InternalServerException("Creator service is not available", e);
         }
     }
 
     /**
-     * Update data of a specific creator
-     * @param userId ID of the user (creator)
-     * @param newUsername Username of the creator
+     * Get creator by their id.
+     * @param creatorId Creator id
+     * @throws InternalServerException If the creator service is not available
+     * @return Creator
      */
-    public void updateCreator(@Min(value = 1, message = INCORRECT_USER_ID) long userId,
-                              @NotNull(message = NULL_USER_NAME)
-                              @Pattern(regexp = USER_NAME_REGEX, message = INCORRECT_USER_NAME) String newUsername)
-            throws CreatorServiceException {
-        if (!creatorRepository.existsById(userId)) {
-            throw new CreatorServiceException("Creator with the ID doesn't exist!");
+    public Creator getCreator(Long creatorId) {
+        try {
+            URI uri = UriComponentsBuilder
+                    .fromPath("/internal/profile/{id}/username")
+                    .buildAndExpand(creatorId)
+                    .toUri();
+            String name = restClient.get()
+                    .uri(uri)
+                    .retrieve()
+                    .toEntity(String.class)
+                    .getBody();
+            return new Creator(creatorId, name);
+        } catch (ResourceAccessException e) {
+            throw new InternalServerException("Creator service is not available", e);
         }
-        creatorRepository.save(new Creator(userId, newUsername));
     }
 }

@@ -7,12 +7,13 @@ import lombok.RequiredArgsConstructor;
 import me.zedaster.articleservice.dto.article.Article;
 import me.zedaster.articleservice.dto.article.ArticleData;
 import me.zedaster.articleservice.dto.article.ArticleSummary;
+import me.zedaster.articleservice.dto.article.Creator;
 import me.zedaster.articleservice.entity.ArticleInfo;
-import me.zedaster.articleservice.entity.Creator;
 import me.zedaster.articleservice.repository.ArticleInfoRepository;
-import me.zedaster.articleservice.repository.CreatorRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
@@ -46,15 +47,16 @@ public class ArticleService {
 
     private final ArticleInfoRepository articleInfoRepository;
 
-    private final CreatorRepository creatorRepository;
-
     private final ContentService contentService;
+
+    private final CreatorService creatorService;
 
     /**
      * Gets a certain article from a storage
      * @param id ID of the article
      * @return Optional object with article or nothing if article with the ID doesn't exist
      */
+    @Transactional(propagation = Propagation.SUPPORTS)
     public Optional<Article> getArticle(@Min(value = 1, message = INCORRECT_ARTICLE_ID) long id) {
         Optional<ArticleInfo> info = articleInfoRepository.findById(id);
         if (info.isEmpty()) {
@@ -69,7 +71,9 @@ public class ArticleService {
         } catch (NoSuchElementException e) {
             throw new InternalServerException("ArticleInfo exists, but there's no content for the article!", e);
         }
-        return Optional.of(new Article(info.get(), content));
+
+        Creator creator = creatorService.getCreator(info.get().getCreatorId());
+        return Optional.of(new Article(info.get(), content, creator));
     }
 
     /**
@@ -77,26 +81,31 @@ public class ArticleService {
      * @param pageNumber Number of page (starts from 1)
      * @return List of article summaries
      */
+    @Transactional(propagation = Propagation.SUPPORTS)
     public List<ArticleSummary> getRecentArticleSummaries(
             @Min(value = 1, message = INCORRECT_PAGE_NUMBER) int pageNumber) {
         PageRequest pageRequest = PageRequest.of(pageNumber - 1, RECENT_ARTICLES_PAGE_SIZE);
         List<ArticleInfo> articleInfos = articleInfoRepository.findAllByOrderByCreatedAtDesc(pageRequest);
-        return ArticleSummary.fromArticleInfos(articleInfos);
+        List<Creator> creators = creatorService.getCreatorsByIds(articleInfos.stream()
+                .map(ArticleInfo::getCreatorId)
+                .toList());
+        return ArticleSummary.fromArticleInfosAndCreators(articleInfos, creators);
     }
 
     /**
      * Gets summaries of articles that are published by user with the specified ID.
-     * @param userId specified ID of the user
+     * @param creator Creator of the articles
      * @param pageNumber Number of page (starts from 1)
      * @return List of article summaries
      */
-    public List<ArticleSummary> getArticleSummariesByUserId(
-            @Min(value = 1, message = INCORRECT_USER_ID) long userId,
+    @Transactional(propagation = Propagation.SUPPORTS)
+    public List<ArticleSummary> getArticleSummariesByCreator(
+            Creator creator,
             @Min(value = 1, message = INCORRECT_PAGE_NUMBER) int pageNumber) {
         PageRequest pageRequest = PageRequest.of(pageNumber - 1, USER_ARTICLES_PAGE_SIZE);
-        Creator creator = new Creator(userId, null);
-        List<ArticleInfo> articleInfos = articleInfoRepository.findAllByCreatorOrderByCreatedAtDesc(creator, pageRequest);
-        return ArticleSummary.fromArticleInfos(articleInfos);
+        List<ArticleInfo> articleInfos = articleInfoRepository.findAllByCreatorIdOrderByCreatedAtDesc(
+                creator.getId(), pageRequest);
+        return ArticleSummary.fromArticleInfosBySingleCreator(articleInfos, creator);
     }
 
     /**
@@ -105,19 +114,18 @@ public class ArticleService {
      * @param articleData Data for the new article
      * @return ID of the new article
      */
+    @Transactional(rollbackFor = {ArticleServiceException.class, InternalServerException.class})
     public long createArticle(
             @Min(value = 1, message = INCORRECT_USER_ID) long userId,
-            @NotNull(message = ARTICLE_DATA_NOT_NULL) @Valid ArticleData articleData) throws ArticleServiceException {
-        Creator creator = creatorRepository.findById(userId).orElseThrow(() ->
-                new ArticleServiceException("User with the ID doesn't exist!"));
-        if (articleInfoRepository.existsByCreatorAndTitle(creator, articleData.getTitle())) {
+            @NotNull(message = ARTICLE_DATA_NOT_NULL) @Valid ArticleData articleData) {
+        if (articleInfoRepository.existsByCreatorIdAndTitle(userId, articleData.getTitle())) {
             throw new ArticleServiceException("User already has an article with the same title!");
         }
-        ArticleInfo info = articleInfoRepository.save(new ArticleInfo(articleData.getTitle(), Instant.now(), creator));
+        ArticleInfo info = articleInfoRepository.save(new ArticleInfo(articleData.getTitle(), Instant.now(), userId));
+
         try {
             contentService.saveContent(info.getId(), articleData.getContent());
         } catch (ContentServiceException e) {
-            articleInfoRepository.deleteById(info.getId());
             throw new InternalServerException("Failed to save content for the article!", e);
         }
         return info.getId();
@@ -128,15 +136,14 @@ public class ArticleService {
      * @param articleId ID of the article
      * @param articleData New data for the article
      */
+    @Transactional(rollbackFor = {ArticleServiceException.class, InternalServerException.class})
     public void updateArticle(
             @Min(value = 1, message = INCORRECT_ARTICLE_ID) long articleId,
-            @NotNull(message = ARTICLE_DATA_NOT_NULL) @Valid ArticleData articleData) throws ArticleServiceException {
+            @NotNull(message = ARTICLE_DATA_NOT_NULL) @Valid ArticleData articleData) {
         ArticleInfo oldInfo = articleInfoRepository.findById(articleId).orElseThrow(() ->
                 new ArticleServiceException("Article with the specified ID doesn't exist!"));
 
-        if (articleInfoRepository.existsByCreatorAndTitle(oldInfo.getCreator(), articleData.getTitle())) {
-            throw new ArticleServiceException("User already has an article with the same title!");
-        }
+        ensureUniqueTitle(oldInfo.getCreatorId(), articleId, articleData.getTitle());
 
         ArticleInfo newInfo = oldInfo.copy();
         newInfo.setTitle(articleData.getTitle());
@@ -145,8 +152,17 @@ public class ArticleService {
         try {
             contentService.saveContent(oldInfo.getId(), articleData.getContent());
         } catch (ContentServiceException e) {
-            articleInfoRepository.save(oldInfo);
             throw new InternalServerException("Failed to update content for the article!", e);
+        }
+    }
+
+    /**
+     * Checks if the user has another article with the same title. If so, throws an exception
+     */
+    private void ensureUniqueTitle(long creatorId, long articleId, String title) {
+        List<ArticleInfo> sameNamedArticles = articleInfoRepository.findAllByCreatorIdAndTitle(creatorId, title);
+        if (sameNamedArticles.size() == 1 && !sameNamedArticles.get(0).getId().equals(articleId)) {
+            throw new ArticleServiceException("User already has another article with the same title!");
         }
     }
 }

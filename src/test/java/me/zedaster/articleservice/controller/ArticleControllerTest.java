@@ -2,16 +2,15 @@ package me.zedaster.articleservice.controller;
 
 import me.zedaster.articleservice.dto.article.Article;
 import me.zedaster.articleservice.dto.article.ArticleSummary;
-import me.zedaster.articleservice.dto.article.CreatorData;
+import me.zedaster.articleservice.dto.article.Creator;
 import me.zedaster.articleservice.entity.ArticleInfo;
-import me.zedaster.articleservice.entity.Creator;
 import me.zedaster.articleservice.service.ArticleService;
 import me.zedaster.articleservice.util.TestUtils;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
@@ -40,7 +39,7 @@ public class ArticleControllerTest {
     /**
      * Mock article service
      */
-    @MockBean
+    @MockitoBean
     private ArticleService articleService;
 
     /**
@@ -51,9 +50,9 @@ public class ArticleControllerTest {
     public void getCertainArticle() throws Exception {
         Creator fakeCreator = new Creator(123L, "john");
         Instant createdAt = TestUtils.createInstantOf(2021, 1, 1, 12, 30, 0);
-        ArticleInfo fakeInfo = new ArticleInfo("a".repeat(15), createdAt, fakeCreator);
+        ArticleInfo fakeInfo = new ArticleInfo("a".repeat(15), createdAt, 123L);
         fakeInfo.setId(321L);
-        Article fakeArticle = new Article(fakeInfo, "a".repeat(100));
+        Article fakeArticle = new Article(fakeInfo, "a".repeat(100), fakeCreator);
 
         when(articleService.getArticle(321L)).thenReturn(Optional.of(fakeArticle));
 
@@ -64,8 +63,9 @@ public class ArticleControllerTest {
                 .andExpect(jsonPath("$.title").value("a".repeat(15)))
                 .andExpect(jsonPath("$.content").value("a".repeat(100)))
                 .andExpect(jsonPath("$.createdAt").value("2021-01-01T12:30:00Z"))
-                .andExpect(jsonPath("$.creatorData.*", hasSize(1)))
-                .andExpect(jsonPath("$.creatorData.username").value("john"));
+                .andExpect(jsonPath("$.creator.*", hasSize(2)))
+                .andExpect(jsonPath("$.creator.id").value(123L))
+                .andExpect(jsonPath("$.creator.name").value("john"));
     }
 
     /**
@@ -78,8 +78,8 @@ public class ArticleControllerTest {
         Instant createdAt2 = TestUtils.createInstantOf(2022, 1, 1, 12, 30, 0);
 
         List<ArticleSummary> articleSummaries = List.of(
-                new ArticleSummary(1L, "a".repeat(15), createdAt1, new CreatorData("john")),
-                new ArticleSummary(2L, "b".repeat(15), createdAt2, new CreatorData("bill"))
+                new ArticleSummary(1L, "a".repeat(15), createdAt1, new Creator(123L, "john")),
+                new ArticleSummary(2L, "b".repeat(15), createdAt2, new Creator(321L, "bill"))
         );
         when(articleService.getRecentArticleSummaries(123)).thenReturn(articleSummaries);
 
@@ -89,13 +89,15 @@ public class ArticleControllerTest {
                 .andExpect(jsonPath("$[0].id").value(1L))
                 .andExpect(jsonPath("$[0].title").value("a".repeat(15)))
                 .andExpect(jsonPath("$[0].createdAt").value("2021-01-01T12:30:00Z"))
-                .andExpect(jsonPath("$[0].creatorData.*", hasSize(1)))
-                .andExpect(jsonPath("$[0].creatorData.username").value("john"))
+                .andExpect(jsonPath("$[0].creator.*", hasSize(2)))
+                .andExpect(jsonPath("$[0].creator.id").value(123L))
+                .andExpect(jsonPath("$[0].creator.name").value("john"))
                 .andExpect(jsonPath("$[1].id").value(2L))
                 .andExpect(jsonPath("$[1].title").value("b".repeat(15)))
                 .andExpect(jsonPath("$[1].createdAt").value("2022-01-01T12:30:00Z"))
-                .andExpect(jsonPath("$[1].creatorData.*", hasSize(1)))
-                .andExpect(jsonPath("$[1].creatorData.username").value("bill"));
+                .andExpect(jsonPath("$[1].creator.*", hasSize(2)))
+                .andExpect(jsonPath("$[1].creator.id").value(321L))
+                .andExpect(jsonPath("$[1].creator.name").value("bill"));
     }
 
     /**

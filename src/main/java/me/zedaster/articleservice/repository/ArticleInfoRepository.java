@@ -1,7 +1,6 @@
 package me.zedaster.articleservice.repository;
 
 import me.zedaster.articleservice.entity.ArticleInfo;
-import me.zedaster.articleservice.entity.Creator;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Repository;
@@ -15,7 +14,9 @@ import java.util.List;
 public interface ArticleInfoRepository extends CrudRepository<ArticleInfo, Long> {
     List<ArticleInfo> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
-    List<ArticleInfo> findAllByCreatorOrderByCreatedAtDesc(Creator creator, Pageable pageable);
+    List<ArticleInfo> findAllByCreatorIdOrderByCreatedAtDesc(Long creatorId, Pageable pageable);
 
-    boolean existsByCreatorAndTitle(Creator creator, String title);
+    List<ArticleInfo> findAllByCreatorIdAndTitle(long creatorId, String title);
+
+    boolean existsByCreatorIdAndTitle(Long creatorId, String title);
 }

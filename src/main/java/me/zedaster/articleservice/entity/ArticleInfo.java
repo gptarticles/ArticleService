@@ -12,7 +12,9 @@ import java.time.Instant;
  * Row of article in the database
  */
 @Entity
-@Table(name = "articles")
+@Table(name = "articles", indexes = {
+        @Index(name = "article_summaries_creator_id_index", columnList = "creatorId")
+})
 @Getter
 @Setter
 @EqualsAndHashCode(of = "id")
@@ -36,23 +38,21 @@ public class ArticleInfo {
     private Instant createdAt;
 
     /**
-     * User id of creator of the article
+     * Creator of the article
      */
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "creatorId", referencedColumnName = "creatorId", nullable = false)
-    private Creator creator;
+    private Long creatorId;
 
-    public ArticleInfo(String title, Instant createdAt, Creator creator) {
+    public ArticleInfo(String title, Instant createdAt, Long creatorId) {
         this.title = title;
         this.createdAt = createdAt;
-        this.creator = creator;
+        this.creatorId = creatorId;
     }
 
     private ArticleInfo(ArticleInfo articleInfo) {
         this.id = articleInfo.id;
         this.title = articleInfo.title;
         this.createdAt = articleInfo.createdAt;
-        this.creator = articleInfo.creator;
+        this.creatorId = articleInfo.creatorId;
     }
 
     public ArticleInfo copy() {

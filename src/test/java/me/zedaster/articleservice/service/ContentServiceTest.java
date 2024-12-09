@@ -46,9 +46,6 @@ public class ContentServiceTest {
     @Autowired
     private ContentService contentService;
 
-//    @Autowired
-//    private S3Configuration s3Configuration;
-
     @BeforeAll
     static void beforeAll() {
         minIoContainer.start();

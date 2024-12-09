@@ -6,14 +6,12 @@ import jakarta.validation.Path;
 import me.zedaster.articleservice.dto.article.ArticleData;
 import me.zedaster.articleservice.service.ArticleService;
 import me.zedaster.articleservice.service.ArticleServiceException;
-import me.zedaster.articleservice.service.CreatorService;
-import me.zedaster.articleservice.service.CreatorServiceException;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -27,18 +25,14 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest({ArticleController.class, InternalArticleController.class, CreatorController.class})
+@WebMvcTest({ArticleController.class, InternalArticleController.class})
 public class GlobalExceptionHandlerTest {
 
-    @MockBean
+    @MockitoBean
     private ArticleService articleService;
-
-    @MockBean
-    private CreatorService creatorService;
 
     /**
      * Mock MVC object for testing.
@@ -61,19 +55,6 @@ public class GlobalExceptionHandlerTest {
         mockMvc.perform(post("/internal/articles")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content((contentJson)))
-                .andExpect(status().is(400))
-                .andExpect(jsonPath("$.*", hasSize(1)))
-                .andExpect(jsonPath("$.message").value("Some error message"));
-    }
-
-    @Test
-    public void handleCreatorServiceException() throws Exception {
-        doThrow(new CreatorServiceException("Some error message"))
-                .when(creatorService).updateCreator(anyLong(), anyString());
-
-        mockMvc.perform(put("/internal/articles/creators/1")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"newUsername\": \"john\"}"))
                 .andExpect(status().is(400))
                 .andExpect(jsonPath("$.*", hasSize(1)))
                 .andExpect(jsonPath("$.message").value("Some error message"));

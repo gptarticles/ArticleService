@@ -35,13 +35,13 @@ public class Article {
     /**
      * Data of creator of the article
      */
-    private final CreatorData creatorData;
+    private final Creator creator;
 
-    public Article(ArticleInfo articleInfo, String content) {
+    public Article(ArticleInfo articleInfo, String content, Creator creator) {
         this.id = articleInfo.getId();
         this.title = articleInfo.getTitle();
         this.content = content;
         this.createdAt = articleInfo.getCreatedAt();
-        this.creatorData = articleInfo.getCreator().toCreatorData();
+        this.creator = creator;
     }
 }

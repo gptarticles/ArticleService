@@ -69,7 +69,7 @@ public class ContentService {
      * @param articleId ID of the article
      * @param content Content to save
      */
-    public void saveContent(long articleId, String content) throws ContentServiceException {
+    public void saveContent(long articleId, String content) {
         String key = "articles/" + articleId + ".txt";
 
         try {

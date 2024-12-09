@@ -1,11 +1,12 @@
 package me.zedaster.articleservice.controller;
 
+import me.zedaster.articleservice.dto.article.Creator;
 import me.zedaster.articleservice.service.ArticleService;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.Mockito.times;
@@ -26,7 +27,7 @@ public class ProtectedArticleControllerTest {
     /**
      * Mock article service
      */
-    @MockBean
+    @MockitoBean
     private ArticleService articleService;
 
     // getUserArticles GET - Gets articles that written by current user
@@ -36,10 +37,10 @@ public class ProtectedArticleControllerTest {
      */
     @Test
     public void getDefaultPageOfUserArticles() throws Exception {
-        mockMvc.perform(get("/protected/articles/user?tokenPayload.userId=1"))
+        mockMvc.perform(get("/protected/articles/user?tokenPayload.sub=1&tokenPayload.username=test"))
                 .andExpect(status().isOk());
 
-        Mockito.verify(articleService, times(1)).getArticleSummariesByUserId(1, 1);
+        Mockito.verify(articleService, times(1)).getArticleSummariesByCreator(new Creator(1, "test"), 1);
     }
 
     /**
@@ -47,10 +48,10 @@ public class ProtectedArticleControllerTest {
      */
     @Test
     public void getUserArticles() throws Exception {
-        mockMvc.perform(get("/protected/articles/user?tokenPayload.userId=1&page=2"))
+        mockMvc.perform(get("/protected/articles/user?tokenPayload.sub=1&tokenPayload.username=test&page=2"))
                 .andExpect(status().isOk());
 
-        Mockito.verify(articleService, times(1)).getArticleSummariesByUserId(1, 2);
+        Mockito.verify(articleService, times(1)).getArticleSummariesByCreator(new Creator(1, "test"), 2);
     }
 
 }
